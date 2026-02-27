@@ -1,0 +1,65 @@
+﻿  Boofenstein.cpp
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\Boofenstein.cpp(101,2): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\Boofenstein.cpp(120,2): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\Boofenstein.cpp(137,60): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\Boofenstein.cpp(148,15): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\Boofenstein.cpp(184,22): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+  File_Utility.cpp
+  GL_Utility.cpp
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\GL_Utility.cpp(146,85): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\GL_Utility.cpp(155,34): warning C4267: '=': conversion from 'size_t' to 'unsigned int', possible loss of data
+  SegmentPathRenderer.cpp
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(100,76): warning C4244: 'argument': conversion from 'int' to 'GLfloat', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(100,66): warning C4244: 'argument': conversion from 'int' to 'GLfloat', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(135,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(136,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(149,12): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(150,12): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(151,12): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(152,12): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(202,54): warning C4267: '=': conversion from 'size_t' to 'unsigned int', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(223,38): warning C4244: 'argument': conversion from 'float' to 'const unsigned __int64', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(239,117): warning C4838: conversion from 'double' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(239,117): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(240,117): warning C4838: conversion from 'double' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(240,117): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(240,154): warning C4838: conversion from 'double' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(240,154): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(241,156): warning C4838: conversion from 'double' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(241,156): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(243,117): warning C4838: conversion from 'double' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(243,117): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(244,156): warning C4838: conversion from 'double' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(244,156): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(269,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(269,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(270,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(270,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(271,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(271,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(273,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(273,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(274,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(274,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(275,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(275,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(277,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(277,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(278,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(278,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(279,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(279,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(281,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(281,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(282,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(282,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(283,136): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(283,136): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(292,86): warning C4267: 'argument': conversion from 'size_t' to 'GLint', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(325,16): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\100058011\source\repos\Boofenstein\Boofenstein\SegmentPathRenderer.cpp(326,17): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+  Window.cpp
+  Generating Code...
+  glad.c
+LINK : warning LNK4098: defaultlib 'MSVCRT' conflicts with use of other libs; use /NODEFAULTLIB:library
+  Boofenstein.vcxproj -> C:\Users\100058011\source\repos\Boofenstein\Boofenstein\x64\Debug\Boofenstein.exe

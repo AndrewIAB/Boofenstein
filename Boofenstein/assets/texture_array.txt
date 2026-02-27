@@ -1,0 +1,8 @@
+doom_fflat04_albedo.png
+car.jpg
+dog.bmp
+doom_ah29.png
+brick_wall_albedo.png
+brick_wall_specular.png
+brick_wall_normal.png
+doom_fflat04_normal.png
