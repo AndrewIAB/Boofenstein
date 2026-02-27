@@ -1,0 +1,4 @@
+// Hint files help the Visual Studio IDE interpret Visual C++ identifiers
+// such as names of functions and macros.
+// For more information see https://go.microsoft.com/fwlink/?linkid=865984
+#define IMPL_PUSH_COMMAND(TYPE) void EditorMap::push_command(const TYPE& command) { remove_after_iterator(); command_log.push_back(dynamic_cast<EditorCommandBase*>(new TYPE(command))); command_iterator = std::prev(command_log.end()); (*command_iterator)->push(this->map_builder); }
