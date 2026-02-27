@@ -1,0 +1,18 @@
+#pragma once
+
+#include <list>
+
+#include "MapBuilder.hpp"
+
+namespace EditorInterface {
+	void init();
+	void quit();
+
+	void draw();
+	void update();
+
+	void add_map(std::string title);
+	//std::list<MapBuilder>& get_map_builder_list();
+
+	MapBuilder* get_current_map_builder();
+}

@@ -1,0 +1,324 @@
+#include "EditorRenderer.hpp"
+
+#include <iostream>
+#include <glad/glad.h>
+
+#include "Window.hpp"
+#include "GL_Utility.hpp"
+
+static class {
+private:
+	unsigned int vao;
+	unsigned int vbo;
+
+	unsigned int program;
+
+	unsigned int u_translation_mat;
+	unsigned int u_orthogonal_mat;
+	unsigned int u_aspect_ratio;
+	unsigned int u_color;
+
+	float orthogonal_mat_data[9];
+public:
+	MapVec2 offset = MapVec2();
+	MapPositionComponent scale = DEFAULT_MAP_UNIT_SIZE;
+
+	void init() {
+		const float data[] = {
+			0, 0,
+			1, 0
+		};
+
+		glGenVertexArrays(1, &this->vao);
+		glGenBuffers(1, &this->vbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, this->vbo);
+		glBindVertexArray(this->vao);
+
+		glBufferData(GL_ARRAY_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+
+		this->program = GL_Utility::load_program("assets/shaders/render_2d.vert", "assets/shaders/render_2d.frag");
+
+		this->u_translation_mat	= glGetUniformLocation(this->program, "u_translation_mat");
+		this->u_orthogonal_mat	= glGetUniformLocation(this->program, "u_orthogonal_mat");
+		this->u_aspect_ratio	= glGetUniformLocation(this->program, "u_aspect_ratio");
+		this->u_color			= glGetUniformLocation(this->program, "u_color");
+
+		// Initialize 2D view
+		// EditorRenderer::set_2d_view(MapVec2(), DEFAULT_MAP_UNIT_SIZE);
+	}
+
+	void gen_orthogonal_mat(float* out, Vec2 a, Vec2 b) {
+		Vec2 delta = b - a;
+		float length = delta.length();
+
+		float inv_length = 1.0 / length;
+
+		Vec2 tangent = delta * inv_length;
+		Vec2 normal = Vec2(tangent.y, -tangent.x);
+
+		out[0] = tangent.x;	out[1] = tangent.y;	out[2] = a.x * inv_length;
+		out[3] = normal.x;	out[4] = normal.y;	out[5] = a.y * inv_length;
+		out[6] = 0;			out[7] = 0;			out[8] = inv_length;
+	}
+
+	void set_color(float r, float g, float b) {
+		glUseProgram(this->program);
+		glUniform3f(this->u_color, r, g, b);
+	}
+
+	void set_aspect_ratio(float a) {
+		glUseProgram(this->program);
+		glUniform1f(this->u_aspect_ratio, a);
+	}
+
+	void update_view(MapPositionComponent unit_size) {
+		float x = (float)this->offset.x / (float)unit_size;
+		float y = (float)this->offset.y / (float)unit_size;
+
+		float data[] = {
+			1,	0,	-x,
+			0,	1,	-y,
+			0,	0,	(float)scale / (float)unit_size
+		};
+
+		glUseProgram(this->program);
+		glUniformMatrix3fv(this->u_translation_mat, 1, GL_TRUE, data);
+	}
+
+	void use() {
+		glUseProgram(this->program);
+		glBindVertexArray(this->vao);
+	}
+
+	void draw_line(Vec2 point_a, Vec2 point_b) {
+		gen_orthogonal_mat(this->orthogonal_mat_data, point_a, point_b);
+
+		glUniformMatrix3fv(this->u_orthogonal_mat, 1, GL_TRUE, this->orthogonal_mat_data);
+
+		glDrawArrays(GL_LINES, 0, 2);
+	}
+
+	void draw_point(Vec2 point) {
+		this->orthogonal_mat_data[0] = 1;	this->orthogonal_mat_data[1] = 0;	this->orthogonal_mat_data[2] = point.x;
+		this->orthogonal_mat_data[3] = 0;	this->orthogonal_mat_data[4] = 1;	this->orthogonal_mat_data[5] = point.y;
+		this->orthogonal_mat_data[6] = 0;	this->orthogonal_mat_data[7] = 0;	this->orthogonal_mat_data[8] = 1;
+
+		glUniformMatrix3fv(this->u_orthogonal_mat, 1, GL_TRUE, this->orthogonal_mat_data);
+
+		glDrawArrays(GL_POINTS, 0, 1);
+	}
+
+} renderer_2d;
+
+static class {
+private:
+	unsigned int vao;
+	unsigned int vbo;
+
+	unsigned int program;
+
+	unsigned int u_translation_mat;
+	unsigned int u_orthogonal_mat;
+	unsigned int u_perspective_mat;
+	unsigned int u_aspect_ratio;
+	unsigned int u_texture_layer;
+
+	float orthogonal_mat_data[16];
+public:
+	MapVec2 offset = MapVec2();
+	MapPositionComponent scale = DEFAULT_MAP_UNIT_SIZE;
+	float rotation = 0.0f;
+
+	void init() {
+		const float data[] = {
+			// WALL
+			0, 0, 0,	0, 0,
+			1, 0, 0,	1, 0,
+			1, 1, 0,	1, 1,
+			0, 0, 0,	0, 0,
+			0, 1, 0,	0, 1,
+			1, 1, 0,	1, 1,
+		};
+
+		glGenVertexArrays(1, &this->vao);
+		glGenBuffers(1, &this->vbo);
+
+		glBindVertexArray(this->vao);
+		glBindBuffer(GL_ARRAY_BUFFER, this->vbo);
+
+		glBufferData(GL_ARRAY_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(0));
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+		this->program = GL_Utility::load_program("assets/shaders/render_3d.vert", "assets/shaders/render_3d.frag");
+
+		this->u_translation_mat = glGetUniformLocation(this->program, "u_translation_mat");
+		this->u_orthogonal_mat = glGetUniformLocation(this->program, "u_orthogonal_mat");
+		this->u_perspective_mat = glGetUniformLocation(this->program, "u_perspective_mat");
+		this->u_aspect_ratio = glGetUniformLocation(this->program, "u_aspect_ratio");
+		this->u_texture_layer = glGetUniformLocation(this->program, "u_texture_layer");
+	}
+
+	void gen_orthogonal_mat(float* out, Vec2 a, Vec2 b) {
+		out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
+		out[4] = 0; out[5] = 1; out[6] = 0; out[7] = 0;
+		out[8] = 0; out[9] = 0; out[10] = 1; out[11] = 0;
+		out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1;
+	}
+
+	void draw_wall(Vec2 point_a, Vec2 point_b) {
+		gen_orthogonal_mat(this->orthogonal_mat_data, point_a, point_b);
+
+		glUniformMatrix4fv(this->u_orthogonal_mat, 1, GL_FALSE, this->orthogonal_mat_data);
+
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
+} renderer_3d;
+
+static void draw_2d_grid(const MapBuilder& map_builder, float grid_line_width, float axis_line_width, float* orthogonal_mat_data) {
+	MapBuilder& map = const_cast<MapBuilder&>(map_builder);
+
+	int w = Window::get_width();
+	int h = Window::get_height();
+
+	int unit_size = map.get_unit_size();
+	int unit_size_sqr = map.get_unit_size() * map.get_unit_size();
+
+	int grid_w = w / 2 * renderer_2d.scale / unit_size_sqr;
+	int grid_h = h / 2 * renderer_2d.scale / unit_size_sqr;
+
+	for (int x = -grid_w; x < grid_w; x ++) {
+		if (x + renderer_2d.offset.x == 0) {
+			glLineWidth(axis_line_width);
+			renderer_2d.set_color(0.25, 0.25, 0.5);
+		}
+		else if ((x + renderer_2d.offset.x) % unit_size == 0) {
+			glLineWidth(grid_line_width);
+			renderer_2d.set_color(0.5, 0.5, 0.5);
+		}
+		else {
+			glLineWidth(grid_line_width);
+			renderer_2d.set_color(0.25, 0.25, 0.25);
+		}
+
+		MapVec2 point_a = MapVec2(x + renderer_2d.offset.x, MAP_MIN_POS);
+		MapVec2 point_b = MapVec2(x + renderer_2d.offset.x, MAP_MAX_POS);
+
+		//draw_2d_line(Vec2(point_a.x, point_b.y), Vec2(point_b.x, point_b.y), orthogonal_mat_data);
+		renderer_2d.draw_line(map.map_position_to_gl(point_a), map.map_position_to_gl(point_b));
+	}
+
+	for (int y = -grid_h; y < grid_h; y ++) {
+		if (y + renderer_2d.offset.y == 0) {
+			glLineWidth(axis_line_width);
+			renderer_2d.set_color(0.25, 0.5, 0.25);
+		}
+		else if ((y + renderer_2d.offset.y) % unit_size == 0) {
+			glLineWidth(grid_line_width);
+			renderer_2d.set_color(0.5, 0.5, 0.5);
+		}
+		else {
+			glLineWidth(grid_line_width);
+			renderer_2d.set_color(0.25, 0.25, 0.25);
+		}
+
+		MapVec2 point_a = MapVec2(MAP_MIN_POS, y + renderer_2d.offset.y);
+		MapVec2 point_b = MapVec2(MAP_MAX_POS, y + renderer_2d.offset.y);
+
+		//draw_2d_line(Vec2(point_a.x, point_b.y), Vec2(point_b.x, point_b.y), orthogonal_mat_data);
+		renderer_2d.draw_line(map.map_position_to_gl(point_a), map.map_position_to_gl(point_b));
+	}
+}
+
+void EditorRenderer::init() {
+	renderer_2d.init();
+	renderer_3d.init();
+}
+
+void EditorRenderer::quit() {
+	std::cout << "DONT FORGET TO SET EditorRenderer::quit PLESE PLESE PLESE LESEPL EPELSEPL EEPSLDL FUCK\n";
+}
+
+void EditorRenderer::set_2d_view(const MapBuilder& map_builder, MapVec2 pos, MapPositionComponent scale) {
+	MapBuilder& map = const_cast<MapBuilder&>(map_builder);
+
+	renderer_2d.offset = MapVec2(pos.x, pos.y);
+	renderer_2d.scale = scale;
+
+	renderer_2d.update_view(map.get_unit_size());
+}
+
+void EditorRenderer::draw_2D(
+	const MapBuilder& map_builder, MapVec2* sel_point, MapSegment* sel_segment, bool draw_grid,
+	Vec3 sel_point_color, Vec3 line_color,
+	float grid_line_width, float axis_line_width, float line_width, float point_size
+) {
+	MapBuilder& map = const_cast<MapBuilder&>(map_builder);
+
+	float orthogonal_mat_data[9];
+	//float aspect = (float)Window::get_width() / (float)Window::get_height();
+
+	const std::list<MapSegment>& segments = map.get_segment_list();
+
+	glViewport(0, 0, Window::get_width(), Window::get_height());
+
+	renderer_2d.use();
+	renderer_2d.set_aspect_ratio((float)Window::get_width() / (float)Window::get_height());
+
+	if (draw_grid) {
+		draw_2d_grid(map_builder, grid_line_width, axis_line_width, orthogonal_mat_data);
+	}
+
+	glLineWidth(line_width);
+	renderer_2d.set_color(line_color.x, line_color.y, line_color.z);
+
+	for (std::list<MapSegment>::const_iterator it = segments.begin(); it != segments.end(); ++it) {
+		if (std::addressof(*it) == sel_segment) {
+			renderer_2d.set_color(sel_point_color.x, sel_point_color.y, sel_point_color.z);
+		}
+		else {
+			renderer_2d.set_color(line_color.x, line_color.y, line_color.z);
+		}
+
+		MapVec2 point_a = *it->point_a;
+		MapVec2 point_b = *it->point_b;
+
+		Vec2 point_a_gl = map.map_position_to_gl(point_a);
+		Vec2 point_b_gl = map.map_position_to_gl(point_b);
+
+		renderer_2d.draw_line(point_a_gl, point_b_gl);
+
+		Vec2 mid_point = (point_a_gl + point_b_gl) * 0.5;
+		Vec2 delta = point_b_gl - point_a_gl;
+		Vec2 normal = Vec2(delta.y, -delta.x);
+		normal.normalize();
+		normal *= 1.0 / (float)map.get_unit_size();
+
+
+		renderer_2d.draw_line(mid_point, mid_point + normal);
+	}
+
+	const std::list<MapVec2>& points = map.get_point_list();
+
+	glPointSize(point_size);
+
+	for (std::list<MapVec2>::const_iterator it = points.begin(); it != points.end(); ++it) {
+		if (std::addressof(*it) == sel_point) {
+			renderer_2d.set_color(sel_point_color.x, sel_point_color.y, sel_point_color.z);
+		}
+		else {
+			renderer_2d.set_color(line_color.x, line_color.y, line_color.z);
+		}
+
+		Vec2 point = map.map_position_to_gl(*it);
+
+		renderer_2d.draw_point(point);
+	}
+}

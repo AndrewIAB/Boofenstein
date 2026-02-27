@@ -1,0 +1,718 @@
+#include "EditorInterface.hpp"
+
+#include <iostream>
+#include <cmath>
+
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+#include <imgui/backends/imgui_impl_glfw.h>
+#include <imgui/backends/imgui_impl_opengl3.h>
+#include <imgui/imgui_stdlib.h>
+#include <imgui/imgui.h>
+
+#include "EditorRenderer.hpp"
+#include "Window.hpp"
+
+#define EDITOR_TOOL_Select          0
+#define EDITOR_TOOL_Move            1
+#define EDITOR_TOOL_CreatePoints    2
+#define EDITOR_TOOL_CreateSegments  3
+#define EDITOR_TOOL_DeletePoints    4
+#define EDITOR_TOOL_DeleteSegments  5
+#define EDITOR_TOOL_DrawSegments    6
+#define EDITOR_TOOL_SplitSegments   7
+
+#define EDITOR_VIEW_2D  0
+#define EDITOR_VIEW_3D  1
+
+#define IS_EDITING_TEST !(ImGui::IsWindowFocused() || ImGui::IsWindowHovered());
+
+#define MAX_MAP_HISTORY 32
+
+#define MAX(x, y) (x > y ? x : y)
+#define MIN(x, y) (x < y ? x : y)
+
+struct MapTab {
+    std::list<MapBuilder> change_history;
+
+    MapBuilder map;
+    bool changed;
+    int id;
+
+    std::string title;
+
+    inline bool operator==(MapTab& t) { return t.id == id; }
+    inline MapTab(std::string title, int id) : map() {
+        this->id = id;
+        this->changed = false;
+        this->change_history.push_back(this->map);
+
+        this->title = title;
+    }
+};
+
+static struct {
+    bool preferences_open       = false;
+
+    bool is_editing             = false;
+
+    MapVec2* sel_point          = nullptr;
+    MapSegment* sel_segment     = nullptr;
+
+    MapVec2 position_2d = MapVec2();
+    MapPositionComponent scale_2d = DEFAULT_MAP_UNIT_SIZE;
+
+    MapTab* tab;
+
+} editor_state;
+
+static struct {
+    int line_width = 1, point_size = 4;
+    Vec3 sel_point_color = Vec3(1, 0, 0);
+    Vec3 line_color = Vec3(1, 1, 1);
+
+    bool draw_grid = true;
+
+    int view_mode = 0;
+} editor_pref;
+
+static class {
+public:
+    bool is_open = false;
+    int current_tool = 0;
+
+    void show() {
+        if (ImGui::Begin("Editor Tools", &is_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+            editor_state.is_editing &= IS_EDITING_TEST;
+
+            ImGui::RadioButton("Select", &current_tool, EDITOR_TOOL_Select);
+            ImGui::SameLine();
+            ImGui::RadioButton("Move", &current_tool, EDITOR_TOOL_Move);
+
+            ImGui::RadioButton("Create Points", &current_tool, EDITOR_TOOL_CreatePoints);
+            ImGui::SameLine();
+            ImGui::RadioButton("Create Segments", &current_tool, EDITOR_TOOL_CreateSegments);
+
+            ImGui::RadioButton("Delete Points", &current_tool, EDITOR_TOOL_DeletePoints);
+            ImGui::SameLine();
+            ImGui::RadioButton("Delete Segments", &current_tool, EDITOR_TOOL_DeleteSegments);
+
+            ImGui::RadioButton("Draw Segments", &current_tool, EDITOR_TOOL_DrawSegments);
+            ImGui::SameLine();
+            ImGui::RadioButton("Split Segments", &current_tool, EDITOR_TOOL_SplitSegments);
+        }
+
+        ImGui::End();
+    }
+} editor_tools_window;
+
+static class {
+public:
+    bool is_open = false;
+
+    void show() {
+        if (ImGui::Begin("Map Properties", &is_open)) {
+            editor_state.is_editing &= IS_EDITING_TEST;
+
+            std::string& map_title = editor_state.tab->title;
+            int map_unit = editor_state.tab->map.get_unit_size();
+
+            ImGui::InputText("Title", &map_title);
+
+            if (ImGui::SliderInt("Unit Size", &map_unit, 1, 16)) {
+                editor_state.tab->map.set_unit_size(map_unit);
+            }
+        }
+        ImGui::End();
+    }
+} map_properties_window;
+
+static class {
+public:
+    bool is_open = false;
+
+    void show() {
+        if (ImGui::Begin("Materials", &is_open)) {
+            editor_state.is_editing &= IS_EDITING_TEST;
+
+            ImGui::Columns(2, "locations");
+            ImGui::SetColumnWidth(0, 100);
+
+            // TODO
+
+            ImGui::NextColumn();
+
+            // TODO
+
+            ImGui::Columns();
+        }
+        ImGui::End();
+    }
+} map_materials_window;
+
+static class {
+public:
+    int next_map_id = 0;
+
+    std::list<MapTab> open_tabs;
+    MapTab* current_tab = nullptr;
+
+    std::list<MapTab>::iterator get_map_iterator(MapTab* tab) {
+        for (std::list<MapTab>::iterator it = open_tabs.begin(); it != open_tabs.end(); ++it) {
+            if (tab == std::addressof(*it)) {
+                return it;
+            }
+        }
+
+        return open_tabs.end();
+    }
+
+    bool show_map_tab(MapTab& tab) {
+        bool tab_visible = true;
+
+        ImGuiItemFlags open_flag = current_tab == std::addressof(tab) ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+        ImGuiItemFlags change_flag = tab.changed ? ImGuiTabItemFlags_UnsavedDocument : ImGuiTabItemFlags_None;
+
+        ImGui::PushID(tab.id);
+        bool in_tab = ImGui::BeginTabItem(tab.title.data(), &tab_visible, open_flag | change_flag);
+        if (ImGui::IsItemClicked()) {
+            current_tab = std::addressof(tab);
+        }
+
+        if (in_tab) { ImGui::EndTabItem(); }
+        ImGui::PopID();
+
+        return tab_visible;
+    }
+
+    void show_main_tab_bar() {
+        if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_DrawSelectedOverline)) {
+            editor_state.is_editing &= IS_EDITING_TEST;
+
+            for (std::list<MapTab>::iterator it = open_tabs.begin(); it != open_tabs.end(); ++it) {
+                bool tab_visible = show_map_tab(*it);
+
+                if (tab_visible == false) {
+                    MapTab* tab = std::addressof(*it);
+
+                    if (*it == open_tabs.back()) {
+                        close_tab(tab);
+                        break;
+                    }
+                    else {
+                        it++;
+                        close_tab(tab);
+                    }
+                }
+            }
+
+            if (ImGui::TabItemButton("+")) {
+                new_tab();
+            }
+
+            ImGui::EndTabBar();
+        }
+    }
+
+    void show_main_menu() {
+        if (ImGui::BeginMenu("File")) {
+            editor_state.is_editing &= IS_EDITING_TEST;
+
+            if (ImGui::MenuItem("New", "Alt + F + N")) {
+                new_tab();
+            }
+            if (ImGui::MenuItem("Open", "Alt + F + O")) {
+                // TODO
+            }
+            if (ImGui::MenuItem("Close", "Alt + F + C", nullptr, current_tab != nullptr)) {
+                close_tab(current_tab);
+            }
+            
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Save", "Ctrl + S", nullptr, current_tab != nullptr)) {
+                // TODO
+            }
+            if (ImGui::MenuItem("Save As", "Ctrl + Shift + S", nullptr, current_tab != nullptr)) {
+                // TODO
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Undo", "Ctrl + Z", nullptr, current_tab != nullptr)) {
+                roll_back_map();
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Window")) {
+            editor_state.is_editing &= IS_EDITING_TEST;
+
+            ImGui::MenuItem("Editor Tools", "Alt + W + E",      &editor_tools_window.is_open,   current_tab != nullptr);
+            ImGui::MenuItem("Map Properties", "Alt + W + P",    &map_properties_window.is_open, current_tab != nullptr);
+            ImGui::MenuItem("Map Materials", "Alt + W + M",     &map_materials_window.is_open,  current_tab != nullptr);
+
+            ImGui::MenuItem("Preferences", "", &editor_state.preferences_open);
+
+            ImGui::EndMenu();
+        }
+    }
+
+    void show() {
+        ImGui::BeginMainMenuBar();
+        
+        show_main_menu();
+        show_main_tab_bar();
+
+        ImGui::EndMainMenuBar();
+    }
+
+    void new_tab() {
+        // Kind of redundant lol
+        EditorInterface::add_map("Untitled");
+    }
+
+    void close_tab(MapTab* tab) {
+        if (tab == current_tab) {
+            if (open_tabs.size() > 1) {
+                std::list<MapTab>::iterator it = get_map_iterator(tab);
+
+                if (it != open_tabs.begin()) {
+                    it--;
+                }
+                else if (it != open_tabs.end()) {
+                    it++;
+                }
+
+                current_tab = std::addressof(*it);
+            }
+            else {
+                current_tab = nullptr;
+            }
+
+            editor_tools_window.is_open = false;
+            map_properties_window.is_open = false;
+            map_materials_window.is_open = false;
+        }
+
+        open_tabs.remove_if([tab](MapTab& t) { return t == *tab; });
+    }
+
+    void add_map(std::string title) {
+        open_tabs.push_back(MapTab(title, ++next_map_id));
+        current_tab = std::addressof(open_tabs.back());
+    }
+
+    void update_current_map() {
+        if (current_tab == nullptr) {
+            return;
+        }
+
+        if (current_tab->change_history.size() >= MAX_MAP_HISTORY) {
+            current_tab->change_history.erase(current_tab->change_history.begin());
+        }
+
+        current_tab->change_history.push_back(current_tab->map);
+        current_tab->map = current_tab->change_history.back();
+        current_tab->changed = true;
+    }
+
+    void roll_back_map() {
+        if (current_tab == nullptr) {
+            return;
+        }
+
+        if (current_tab->change_history.size() <= 1) {
+            return;
+        }
+
+        current_tab->change_history.erase(std::prev(current_tab->change_history.end()));
+        current_tab->map = current_tab->change_history.back();
+    }
+
+    void save_map() {
+        if (current_tab == nullptr) {
+            return;
+        }
+
+        
+    }
+} main_menu_bar;
+
+void EditorInterface::init() {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+
+    ImGui_ImplGlfw_InitForOpenGL((GLFWwindow*)Window::get_window_ptr(), true);
+    ImGui_ImplOpenGL3_Init();
+}
+
+void EditorInterface::quit() {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+}
+
+static void start_frame() {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+static void end_frame() {
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    //ImGui::EndFrame();
+}
+
+static void draw_map_builder(MapBuilder& map_builder) {
+    switch (editor_pref.view_mode) {
+    case EDITOR_VIEW_2D:
+        EditorRenderer::draw_2D(
+            map_builder, editor_state.sel_point, editor_state.sel_segment, editor_pref.draw_grid,
+            editor_pref.sel_point_color, editor_pref.line_color,
+            0.5, 1.5, editor_pref.line_width, editor_pref.point_size);
+        break;
+
+    case EDITOR_VIEW_3D:
+        break;
+    }
+}
+
+static void assemble_preferences_window() {
+    if (ImGui::Begin("Preferences", &editor_state.preferences_open)) {
+        editor_state.is_editing &= IS_EDITING_TEST;
+
+        ImGui::RadioButton("2D View", &editor_pref.view_mode, EDITOR_VIEW_2D);
+        ImGui::SameLine();
+        ImGui::RadioButton("3D View", &editor_pref.view_mode, EDITOR_VIEW_3D);
+
+        ImGui::Checkbox("Draw Grid", &editor_pref.draw_grid);
+
+        ImGui::SliderInt("Point Size", &editor_pref.point_size, 1, 10);
+        ImGui::SliderInt("Line Width", &editor_pref.line_width, 1, 10);
+    }
+
+    ImGui::End();
+}
+
+static MapVec2 screen_to_map_pos(Vec2 pos_win, MapPositionComponent scale) {
+    Vec2 pos_viewport = pos_win / Vec2(Window::get_width(), Window::get_height());
+    pos_viewport *= 2.0;
+    pos_viewport -= 1.0;
+    pos_viewport.y *= -1;
+
+    float aspect = (float)Window::get_width() / (float)Window::get_height();
+    pos_viewport.x *= aspect;
+
+    Vec2 mouse_pos_map_f = pos_viewport * scale;
+    
+    return MapVec2(roundf(mouse_pos_map_f.x), roundf(mouse_pos_map_f.y));
+}
+
+static bool use_tool_select(ImGuiIO& io, MapVec2 mouse_pos_map, MapBuilder& map) {
+    if (!io.MouseClicked[0]) {
+        return false;
+    }
+
+    MapVec2* point_at = map.get_point_at(mouse_pos_map);
+
+    if (point_at == nullptr) {
+        return false;
+    }
+
+    if (editor_state.sel_point == nullptr) {
+        editor_state.sel_point = point_at;
+    }
+    else {
+        editor_state.sel_segment = map.get_segment(editor_state.sel_point, point_at);
+        editor_state.sel_point = nullptr;
+    }
+
+    return false;
+}
+
+static bool use_tool_move(ImGuiIO& io, MapVec2 mouse_pos_map, MapBuilder& map) {
+    if (io.MouseClicked[0]) {
+        editor_state.sel_point = map.get_point_at(mouse_pos_map);
+    }
+    else if (io.MouseReleased[0]) {
+        editor_state.sel_point = nullptr;
+    }
+    else if (editor_state.sel_point != nullptr) {
+        *editor_state.sel_point = mouse_pos_map;
+        return true;
+    }
+    return false;
+}
+
+static bool use_tool_create_points(ImGuiIO& io, MapVec2 mouse_pos_map, MapBuilder& map) {
+    MapVec2* point_at = map.get_point_at(mouse_pos_map);
+
+    if (io.MouseClicked[0] && point_at == nullptr) {
+        map.add_point(mouse_pos_map);
+        return true;
+    }
+    return false;
+}
+
+static bool use_tool_create_segments(ImGuiIO& io, MapVec2 mouse_pos_map, MapBuilder& map) {
+    if (!io.MouseClicked[0]) {
+        return false;
+    }
+    
+    MapVec2* point_at = map.get_point_at(mouse_pos_map);
+
+    if (editor_state.sel_point != nullptr && point_at != nullptr) {
+        MapVec2* a = editor_state.sel_point;
+        MapVec2* b = point_at;
+
+        MapSegment* prev_seg = map.get_segment(a, b);
+
+        if (prev_seg != nullptr) {
+            map.remove_segment(prev_seg);
+        }
+
+        map.add_segment(MapSegment(a, b));
+
+        editor_state.sel_point = nullptr;
+
+        return true;
+    }
+    
+    editor_state.sel_point = point_at;
+    return false;
+}
+
+static bool use_tool_delete_points(ImGuiIO& io, MapVec2 mouse_pos_map, MapBuilder& map) {
+    if (!io.MouseClicked[0]) {
+        return false;
+    }
+    
+    MapVec2* point_at = map.get_point_at(mouse_pos_map);
+
+    if (point_at != nullptr) {
+        map.remove_point(point_at);
+        return true;
+    }
+    return false;
+}
+
+static bool use_tool_delete_segments(ImGuiIO& io, MapVec2 mouse_pos_map, MapBuilder& map) {
+    if (!io.MouseClicked[0]) {
+        return false;
+    }
+
+    MapVec2* point_at = map.get_point_at(mouse_pos_map);
+    bool used = false;
+
+    if (editor_state.sel_point != nullptr && point_at != nullptr) {
+        MapVec2* a = editor_state.sel_point;
+        MapVec2* b = point_at;
+
+        MapSegment* prev_seg = map.get_segment(a, b);
+
+        if (prev_seg != nullptr) {
+            map.remove_segment(prev_seg);
+
+            used = true;
+        }
+    }
+
+    editor_state.sel_point = point_at;
+    return used;
+}
+
+static bool use_tool_draw_segments(ImGuiIO& io, MapVec2 mouse_pos_map, MapBuilder& map) {
+    if (!io.MouseClicked[0]) {
+        return false;
+    }
+
+    MapVec2* point_at = map.get_point_at(mouse_pos_map);
+    bool used = false;
+
+    if (point_at == nullptr) {
+        point_at = std::addressof(map.add_point(mouse_pos_map));
+        used = true;
+    }
+
+    if (editor_state.sel_point != nullptr) {
+        map.add_segment(MapSegment(editor_state.sel_point, point_at));
+        used = true;
+    }
+
+    editor_state.sel_point = point_at;
+    return used;
+}
+
+static bool use_tool_split_segments(ImGuiIO& io, MapVec2 mouse_pos_map, MapBuilder& map) {
+    if (!io.MouseClicked[0]) {
+        return false;
+    }
+
+    MapVec2* point_at = map.get_point_at(mouse_pos_map);
+
+    if (point_at == nullptr) {
+        return false;
+    }
+
+    if (editor_state.sel_point == nullptr) {
+        editor_state.sel_point = point_at;
+    }
+    else {
+        MapVec2* point_a = editor_state.sel_point;
+        MapVec2* point_b = point_at;
+
+        editor_state.sel_point = nullptr;
+
+        MapVec2 delta = point_b - point_a;
+        if (delta.x * delta.x + delta.y + delta.y <= 2) {
+            return false;
+        }
+        
+        MapVec2 mid_point = MapVec2(((float)point_a->x + (float)point_b->x) * 0.5, ((float)point_a->y + (float)point_b->y) * 0.5);
+        MapVec2* point_mid = std::addressof(map.add_point(mid_point));
+
+        MapSegment* seg_ptr = map.get_segment(point_a, point_b);
+        if (seg_ptr == nullptr) {
+            return false;
+        }
+
+        map.remove_segment(seg_ptr);
+        map.add_segment(MapSegment(point_a, point_mid));
+        map.add_segment(MapSegment(point_mid, point_b));
+
+        return true;
+    }
+    return false;
+}
+
+static bool use_curr_tool(ImGuiIO& io, MapVec2 mouse_pos_map) {
+    switch (editor_tools_window.current_tool) {
+    case EDITOR_TOOL_Select:
+        return use_tool_select(         io, mouse_pos_map, editor_state.tab->map);
+    case EDITOR_TOOL_Move:
+        return use_tool_move(           io, mouse_pos_map, editor_state.tab->map);
+    case EDITOR_TOOL_CreatePoints:
+        return use_tool_create_points(  io, mouse_pos_map, editor_state.tab->map);
+    case EDITOR_TOOL_CreateSegments:
+        return use_tool_create_segments(io, mouse_pos_map, editor_state.tab->map);
+    case EDITOR_TOOL_DeletePoints:
+        return use_tool_delete_points(  io, mouse_pos_map, editor_state.tab->map);
+    case EDITOR_TOOL_DeleteSegments:
+        return use_tool_delete_segments(io, mouse_pos_map, editor_state.tab->map);
+    case EDITOR_TOOL_DrawSegments:
+        return use_tool_draw_segments(  io, mouse_pos_map, editor_state.tab->map);
+    case EDITOR_TOOL_SplitSegments:
+        return use_tool_split_segments( io, mouse_pos_map, editor_state.tab->map);
+    }
+}
+
+static void editor_input_2d(ImGuiIO& io) {
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
+        editor_state.position_2d.x -= 1;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) {
+        editor_state.position_2d.x += 1;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+        editor_state.position_2d.y += 1;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+        editor_state.position_2d.y -= 1;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Comma)) {
+        editor_state.scale_2d += 1;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Period)) {
+        editor_state.scale_2d -= 1;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        editor_tools_window.current_tool = 0;
+        editor_state.sel_point = nullptr;
+        editor_state.sel_segment = nullptr;
+    }
+
+    editor_state.scale_2d = MAX(editor_state.scale_2d, 1);
+
+    Vec2 mouse_pos_screen = Vec2(io.MousePos.x, io.MousePos.y);
+    MapVec2 mouse_pos_map_rel = screen_to_map_pos(mouse_pos_screen, editor_state.scale_2d);
+    MapVec2 mouse_pos_map = mouse_pos_map_rel + editor_state.position_2d;
+
+    if (ImGui::IsMousePosValid()) {
+        if (use_curr_tool(io, mouse_pos_map)) {
+            main_menu_bar.update_current_map();
+        }
+    }
+}
+
+static void editor_input_3d() {
+    
+}
+
+void EditorInterface::draw() {
+    editor_state.is_editing = true;
+        
+    start_frame();
+
+    //ImGui::ShowDemoWindow();
+
+    if (main_menu_bar.current_tab != nullptr) {
+        draw_map_builder(main_menu_bar.current_tab->map);
+    }
+
+    main_menu_bar.show();
+    if (main_menu_bar.current_tab != nullptr) {
+        if (editor_tools_window.is_open)    editor_tools_window.show();
+        if (map_properties_window.is_open)  map_properties_window.show();
+        if (map_materials_window.is_open)   map_materials_window.show();
+    }
+    if (editor_state.preferences_open)      assemble_preferences_window();
+
+    end_frame();
+}
+
+void EditorInterface::update() {
+    if (main_menu_bar.current_tab != nullptr) {
+        editor_state.tab = main_menu_bar.current_tab;
+    }
+    else {
+        editor_state.tab = nullptr;
+    }
+
+    if (editor_state.tab != nullptr) {
+        EditorRenderer::set_2d_view(editor_state.tab->map, editor_state.position_2d, editor_state.scale_2d);
+    }
+
+    if (editor_state.is_editing == false || editor_state.tab == nullptr) {
+        editor_state.sel_point = nullptr;
+        return;
+    }
+
+    // yay
+
+    ImGuiIO io = ImGui::GetIO();
+
+    switch (editor_pref.view_mode) {
+    case EDITOR_VIEW_2D:
+        editor_input_2d(io);
+        break;
+
+    case EDITOR_VIEW_3D:
+        editor_input_3d();
+        break;
+    }
+}
+
+void EditorInterface::add_map(std::string title) {
+    main_menu_bar.add_map(title);
+}
+
+MapBuilder* EditorInterface::get_current_map_builder() {
+    return std::addressof(editor_state.tab->map);
+}

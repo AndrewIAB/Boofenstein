@@ -1,0 +1,19 @@
+#pragma once
+
+#include "MapBuilder.hpp"
+
+namespace EditorRenderer {
+	void init();
+	void quit();
+
+	void set_2d_view(const MapBuilder& map, MapVec2 pos, MapPositionComponent scale);
+
+	void draw_2D(
+		const MapBuilder& map_builder, MapVec2* sel_point, MapSegment* sel_segment, bool draw_grid,
+		Vec3 sel_point_color, Vec3 line_color,
+		float grid_line_width, float axis_line_width, float line_width, float point_size);
+
+	void draw_3D_color(MapBuilder map_builder);
+	//void draw_3D_normal(MapBuilder map_builder);
+	//void draw_3D_uv(MapBuilder map_builder);
+};
